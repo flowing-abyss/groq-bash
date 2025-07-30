@@ -13,7 +13,7 @@ Ensure these programs are installed on your system:
 *   `mpg123`
 *   `curl`
 *   `jq`
-*   `notify-send` (from `libnotify-bin`)
+*   `notify-send` (from `libnotify`)
 *   `wl-copy` (from `wl-clipboard`)
 *   `hyprctl` (Hyprland)
 *   `ffmpeg`
@@ -30,7 +30,7 @@ To get a copy of this project up and running on your local machine, follow these
 2.  **Set up API Key:** Place your Groq API key in a file named `.api` in the project directory.
     Example `.api` file content:
     ```
-    your_groq_api_key_here
+    gsk_P4r7yWYE...
     ```
 3.  **Make the script executable:**
     ```bash
