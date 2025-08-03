@@ -16,7 +16,9 @@ END_AUDIO="$SCRIPT_DIR/stop.mp3"
 
 if pgrep arecord; then
     pkill arecord
-    sleep 0.2s
+    while lsof "$FLAC_AUDIO_FILE" >/dev/null 2>&1; do
+        sleep 0.1
+    done
     mpg123 $END_AUDIO >/dev/null 2>&1 &
     
     notify-send "💬 Speech recognition" &
@@ -28,9 +30,11 @@ if pgrep arecord; then
     text=$(echo "$output" | jq -r '.text' | xargs)
     
     if [ -n "$text" ]; then
-        wl-copy "$text"
+        echo "$text" | wl-copy
         notify-send "📋 Sent to clipboard" &
-        sleep 0.1s
+        while [ "$(wl-paste)" != "$text" ]; do
+            sleep 0.1
+        done
         hyprctl dispatch sendshortcut "CTRL,V,"
     fi
     
