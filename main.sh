@@ -38,10 +38,10 @@ if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" > /dev/null; then
         -H "Content-Type: multipart/form-data" \
         -F file="@${FLAC_AUDIO_FILE}" \
     -F model="${MODEL}")
-    text=$(echo "$output" | jq -r '.text' | xargs)
+    text=$(jq -r '.text' <<< "$output" | xargs)
     
     if [ -n "$text" ]; then
-        echo "$text" | wl-copy
+        printf "%s" "$text" | wl-copy
         notify-send "📋 Sent to clipboard" &
         
         wl_timeout=30
