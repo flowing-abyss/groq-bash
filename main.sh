@@ -13,43 +13,50 @@ MODEL="whisper-large-v3-turbo"
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
 
-if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null; then
-  pkill -f "arecord --format S16_LE"
+if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null 2>&1; then
+  pkill -f "arecord --format S16_LE" >/dev/null 2>&1
 
-  pid=$(cat "$PID_FILE")
+  current_pid=$(cat "$PID_FILE")
   timeout=600
   counter=0
-  while ps -p "$pid" >/dev/null; do
+  while kill -0 "$current_pid" 2>/dev/null; do
     if [ "$counter" -ge "$timeout" ]; then
-      kill -9 "$pid"
+      kill -9 "$current_pid" 2>/dev/null
       break
     fi
     sleep 0.01
     counter=$((counter + 1))
   done
 
-  mpg123 "$END_AUDIO" >/dev/null 2>&1 &
-  notify-send "💬 Speech recognition" &
+  {
+    mpg123 "$END_AUDIO" >/dev/null 2>&1 &
+    notify-send "💬 Speech recognition"
+  } &
 
-  output=$(curl -s https://api.groq.com/openai/v1/audio/transcriptions \
+  output=$(curl -s --compressed --connect-timeout 10 --max-time 60 \
     -H "Authorization: Bearer ${API_KEY}" \
     -H "Content-Type: multipart/form-data" \
     -F file="@${FLAC_AUDIO_FILE}" \
-    -F model="${MODEL}")
-  text=$(jq -r '.text' <<<"$output" | xargs)
+    -F model="${MODEL}" \
+    https://api.groq.com/openai/v1/audio/transcriptions)
+
+  text=$(jq -r '.text' <<<"$output" 2>/dev/null | xargs)
 
   if [ -n "$text" ]; then
     printf "%s" "$text" | wl-copy
     notify-send "📋 Sent to clipboard" &
-    sleep 0.05
+    sleep 0.02
     hyprctl dispatch sendshortcut "CTRL,V,"
   fi
 
-  rm "$FLAC_AUDIO_FILE" "$PID_FILE"
+  rm -f "$FLAC_AUDIO_FILE" "$PID_FILE"
 else
-  mpg123 "$START_AUDIO" >/dev/null 2>&1 &
-  notify-send "🔴 Start recording" &
+  {
+    mpg123 "$START_AUDIO" >/dev/null 2>&1 &
+    notify-send "🔴 Start recording"
+  } &
 
-  arecord --format S16_LE --rate=16000 | ffmpeg -i - -c:a flac -compression_level 1 -f flac "$FLAC_AUDIO_FILE" >/dev/null 2>&1 &
+  arecord --format S16_LE --rate=16000 --buffer-size=1024 \
+    | ffmpeg -f s16le -ar 16000 -ac 1 -i - -c:a flac -compression_level 1 "$FLAC_AUDIO_FILE" >/dev/null 2>&1 &
   echo $! >"$PID_FILE"
 fi
