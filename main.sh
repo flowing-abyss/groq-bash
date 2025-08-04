@@ -13,8 +13,6 @@ MODEL="whisper-large-v3-turbo"
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
 
-#───────────────────────────────────────────────────────────────────────────────
-
 if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null; then
   pkill -f "arecord --format S16_LE"
 
@@ -26,13 +24,13 @@ if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null; then
       kill -9 "$pid"
       break
     fi
-    sleep 0.1
+    sleep 0.01
     counter=$((counter + 1))
   done
 
-  mpg123 $END_AUDIO >/dev/null 2>&1 &
-
+  mpg123 "$END_AUDIO" >/dev/null 2>&1 &
   notify-send "💬 Speech recognition" &
+
   output=$(curl -s https://api.groq.com/openai/v1/audio/transcriptions \
     -H "Authorization: Bearer ${API_KEY}" \
     -H "Content-Type: multipart/form-data" \
@@ -43,25 +41,15 @@ if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null; then
   if [ -n "$text" ]; then
     printf "%s" "$text" | wl-copy
     notify-send "📋 Sent to clipboard" &
-
-    wl_timeout=30
-    wl_counter=0
-    while [ "$(wl-paste)" != "$text" ]; do
-      if [ "$wl_counter" -ge "$wl_timeout" ]; then
-        break
-      fi
-      sleep 0.1
-      wl_counter=$((wl_counter + 1))
-    done
-
+    sleep 0.05
     hyprctl dispatch sendshortcut "CTRL,V,"
   fi
 
   rm "$FLAC_AUDIO_FILE" "$PID_FILE"
 else
-  mpg123 $START_AUDIO >/dev/null 2>&1 &
+  mpg123 "$START_AUDIO" >/dev/null 2>&1 &
   notify-send "🔴 Start recording" &
 
-  arecord --format S16_LE --rate=16000 | ffmpeg -i - -c:a flac -compression_level 0 "$FLAC_AUDIO_FILE" >/dev/null 2>&1 &
+  arecord --format S16_LE --rate=16000 | ffmpeg -i - -c:a flac -compression_level 1 -f flac "$FLAC_AUDIO_FILE" >/dev/null 2>&1 &
   echo $! >"$PID_FILE"
 fi
