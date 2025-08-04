@@ -15,53 +15,53 @@ END_AUDIO="$SCRIPT_DIR/stop.mp3"
 
 #───────────────────────────────────────────────────────────────────────────────
 
-if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" > /dev/null; then
-    pkill -f "arecord --format S16_LE"
-    
-    pid=$(cat "$PID_FILE")
-    timeout=600
-    counter=0
-    while ps -p "$pid" > /dev/null; do
-        if [ "$counter" -ge "$timeout" ]; then
-            kill -9 "$pid"
-            break
-        fi
-        sleep 0.1
-        counter=$((counter + 1))
-    done
-    
-    mpg123 $END_AUDIO >/dev/null 2>&1 &
-    
-    notify-send "💬 Speech recognition" &
-    output=$(curl -s https://api.groq.com/openai/v1/audio/transcriptions \
-        -H "Authorization: Bearer ${API_KEY}" \
-        -H "Content-Type: multipart/form-data" \
-        -F file="@${FLAC_AUDIO_FILE}" \
-    -F model="${MODEL}")
-    text=$(jq -r '.text' <<< "$output" | xargs)
-    
-    if [ -n "$text" ]; then
-        printf "%s" "$text" | wl-copy
-        notify-send "📋 Sent to clipboard" &
-        
-        wl_timeout=30
-        wl_counter=0
-        while [ "$(wl-paste)" != "$text" ]; do
-            if [ "$wl_counter" -ge "$wl_timeout" ]; then
-                break
-            fi
-            sleep 0.1
-            wl_counter=$((wl_counter + 1))
-        done
-        
-        hyprctl dispatch sendshortcut "CTRL,V,"
+if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null; then
+  pkill -f "arecord --format S16_LE"
+
+  pid=$(cat "$PID_FILE")
+  timeout=600
+  counter=0
+  while ps -p "$pid" >/dev/null; do
+    if [ "$counter" -ge "$timeout" ]; then
+      kill -9 "$pid"
+      break
     fi
-    
-    rm "$FLAC_AUDIO_FILE" "$PID_FILE"
+    sleep 0.1
+    counter=$((counter + 1))
+  done
+
+  mpg123 $END_AUDIO >/dev/null 2>&1 &
+
+  notify-send "💬 Speech recognition" &
+  output=$(curl -s https://api.groq.com/openai/v1/audio/transcriptions \
+    -H "Authorization: Bearer ${API_KEY}" \
+    -H "Content-Type: multipart/form-data" \
+    -F file="@${FLAC_AUDIO_FILE}" \
+    -F model="${MODEL}")
+  text=$(jq -r '.text' <<<"$output" | xargs)
+
+  if [ -n "$text" ]; then
+    printf "%s" "$text" | wl-copy
+    notify-send "📋 Sent to clipboard" &
+
+    wl_timeout=30
+    wl_counter=0
+    while [ "$(wl-paste)" != "$text" ]; do
+      if [ "$wl_counter" -ge "$wl_timeout" ]; then
+        break
+      fi
+      sleep 0.1
+      wl_counter=$((wl_counter + 1))
+    done
+
+    hyprctl dispatch sendshortcut "CTRL,V,"
+  fi
+
+  rm "$FLAC_AUDIO_FILE" "$PID_FILE"
 else
-    mpg123 $START_AUDIO >/dev/null 2>&1 &
-    notify-send "🔴 Start recording" &
-    
-    arecord --format S16_LE --rate=16000 | ffmpeg -i - -c:a flac -compression_level 0 "$FLAC_AUDIO_FILE" >/dev/null 2>&1 &
-    echo $! > "$PID_FILE"
+  mpg123 $START_AUDIO >/dev/null 2>&1 &
+  notify-send "🔴 Start recording" &
+
+  arecord --format S16_LE --rate=16000 | ffmpeg -i - -c:a flac -compression_level 0 "$FLAC_AUDIO_FILE" >/dev/null 2>&1 &
+  echo $! >"$PID_FILE"
 fi
