@@ -40,7 +40,7 @@ if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null 2>&1; then
     -F model="${MODEL}" \
     https://api.groq.com/openai/v1/audio/transcriptions)
 
-  text=$(jq -r '.text' <<<"$output" 2>/dev/null | xargs)
+  text=$(jq -r '.text' <<<"$output" 2>/dev/null | awk '{$1=$1};1')
 
   if [ -n "$text" ]; then
     printf "%s" "$text" | wl-copy
