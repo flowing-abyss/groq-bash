@@ -15,7 +15,8 @@ TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 ENABLE_POST_PROCESSING=true
 POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
-POST_PROCESSING_PROMPT="You are a text correction AI. Your only task is to correct grammar, spelling, and punctuation, and format it into paragraphs. It is crucial that you identify the original language of the text and provide the corrected text in that same language. Do not add any explanations, greetings, or any text other than the corrected text itself. The output must be ONLY the final, corrected text. Here is the text to correct: %s"
+POST_PROCESSING_INSTRUCTION_PROMPT="You are a text processing AI. Your only task is to follow the user's instruction. Do not add any explanations, greetings, or any text other than the final, processed text. The output must be ONLY the final text."
+POST_PROCESSING_TASK_PROMPT="Correct grammar, spelling, and punctuation, and format it into paragraphs. It is crucial that you identify the original language of the text and provide the corrected text in that same language."
 
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
@@ -85,11 +86,11 @@ call_transcription_api() {
 call_post_processing_api() {
   local text_to_process="$1"
 
-  local escaped_text
-  escaped_text=$(echo "$text_to_process" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+  local raw_user_content
+  raw_user_content=$(printf "%s\n\nTask: %s\n\nText to process: %s" "$POST_PROCESSING_INSTRUCTION_PROMPT" "$POST_PROCESSING_TASK_PROMPT" "$text_to_process")
 
-  local user_content
-  user_content=$(printf "$POST_PROCESSING_PROMPT" "$escaped_text")
+  local escaped_user_content
+  escaped_user_content=$(echo "$raw_user_content" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
 
   local json_payload
   json_payload=$(printf '{
@@ -100,7 +101,7 @@ call_post_processing_api() {
         "content": "%s"
       }
     ]
-  }' "$POST_PROCESSING_MODEL" "$user_content")
+  }' "$POST_PROCESSING_MODEL" "$escaped_user_content")
 
   curl -s --compressed --connect-timeout 10 --max-time 180 \
     -H "Authorization: Bearer ${API_KEY}" \
