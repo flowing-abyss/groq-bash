@@ -8,10 +8,24 @@ PID_FILE="${TMP_DIR}/recorder.pid"
 FLAC_AUDIO_FILE="${TMP_DIR}/input.flac"
 
 API_KEY=$(cat "${SCRIPT_DIR}/.api")
-MODEL="whisper-large-v3-turbo"
+MODEL="whisper-large-v3"
 
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
+
+play_audio() {
+  local audio_file="$1"
+  local original_volume=$(amixer get Master | grep -o -E '[0-9]+%' | head -n 1 | sed 's/%//')
+
+  if [ -n "$original_volume" ]; then
+    local target_volume=$((original_volume * 60 / 100))
+    amixer set Master "${target_volume}%" >/dev/null 2>&1
+    mpg123 "$audio_file" >/dev/null 2>&1
+    amixer set Master "${original_volume}%" >/dev/null 2>&1
+  else
+    mpg123 "$audio_file" >/dev/null 2>&1
+  fi
+}
 
 if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null 2>&1; then
   pkill -f "arecord --format S16_LE" >/dev/null 2>&1
@@ -29,7 +43,7 @@ if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null 2>&1; then
   done
 
   {
-    mpg123 "$END_AUDIO" >/dev/null 2>&1 &
+    play_audio "$END_AUDIO" &
     notify-send "💬 Speech recognition"
   } &
 
@@ -52,7 +66,7 @@ if [ -f "$PID_FILE" ] && ps -p "$(cat "$PID_FILE")" >/dev/null 2>&1; then
   rm -f "$FLAC_AUDIO_FILE" "$PID_FILE"
 else
   {
-    mpg123 "$START_AUDIO" >/dev/null 2>&1 &
+    play_audio "$START_AUDIO" &
     notify-send "🔴 Start recording"
   } &
 
