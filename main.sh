@@ -7,9 +7,15 @@ TMP_DIR="/tmp"
 PID_FILE="${TMP_DIR}/recorder.pid"
 FLAC_AUDIO_FILE="${TMP_DIR}/input.flac"
 
-TRANSCRIPTION_API_KEY=$(cat "${SCRIPT_DIR}/.api")
+API_KEY=$(cat "${SCRIPT_DIR}/.api")
+
 TRANSCRIPTION_MODEL="whisper-large-v3"
 TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
+
+ENABLE_POST_PROCESSING=true
+POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
+POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
+POST_PROCESSING_PROMPT="You are a text correction AI. Your only task is to correct grammar, spelling, and punctuation, and format it into paragraphs. It is crucial that you identify the original language of the text and provide the corrected text in that same language. Do not add any explanations, greetings, or any text other than the corrected text itself. The output must be ONLY the final, corrected text. Here is the text to correct: %s"
 
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
@@ -67,16 +73,40 @@ stop_audio_recording_process() {
 
 call_transcription_api() {
   local audio_file="$1"
-  local api_key="$2"
-  local model="$3"
-  local api_url="$4"
 
   curl -s --compressed --connect-timeout 10 --max-time 60 \
-    -H "Authorization: Bearer ${api_key}" \
+    -H "Authorization: Bearer ${API_KEY}" \
     -H "Content-Type: multipart/form-data" \
     -F file="@${audio_file}" \
-    -F model="${model}" \
-    "$api_url"
+    -F model="${TRANSCRIPTION_MODEL}" \
+    "$TRANSCRIPTION_API_URL"
+}
+
+call_post_processing_api() {
+  local text_to_process="$1"
+
+  local escaped_text
+  escaped_text=$(echo "$text_to_process" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+
+  local user_content
+  user_content=$(printf "$POST_PROCESSING_PROMPT" "$escaped_text")
+
+  local json_payload
+  json_payload=$(printf '{
+    "model": "%s",
+    "messages": [
+      {
+        "role": "user",
+        "content": "%s"
+      }
+    ]
+  }' "$POST_PROCESSING_MODEL" "$user_content")
+
+  curl -s --compressed --connect-timeout 10 --max-time 180 \
+    -H "Authorization: Bearer ${API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "$json_payload" \
+    "$POST_PROCESSING_API_URL"
 }
 
 if [ ! -f "$PID_FILE" ] || ! ps -p "$(cat "$PID_FILE")" >/dev/null 2>&1; then
@@ -94,12 +124,21 @@ else
     send_desktop_notification "💬 Speech recognition"
   } &
 
-  output=$(call_transcription_api "$FLAC_AUDIO_FILE" "$TRANSCRIPTION_API_KEY" "$TRANSCRIPTION_MODEL" "$TRANSCRIPTION_API_URL")
+  output=$(call_transcription_api "$FLAC_AUDIO_FILE")
 
-  text=$(jq -r '.text' <<<"$output" 2>/dev/null | awk '{$1=$1};1')
+  output=$(jq -r '.text' <<<"$output" 2>/dev/null | awk '{$1=$1};1')
 
-  if [ -n "$text" ]; then
-    copy_text_to_clipboard "$text"
+  if [ "$ENABLE_POST_PROCESSING" = true ] && [ -n "$output" ]; then
+    send_desktop_notification "📝 Post-processing text" &
+    processed_output=$(call_post_processing_api "$output")
+    processed_text=$(echo "$processed_output" | jq -r '.choices[0].message.content' 2>/dev/null | awk '{$1=$1};1')
+    if [ -n "$processed_text" ]; then
+      output="$processed_text"
+    fi
+  fi
+
+  if [ -n "$output" ]; then
+    copy_text_to_clipboard "$output"
     send_desktop_notification "📋 Sent to clipboard" &
     sleep 0.02
     simulate_paste_shortcut
