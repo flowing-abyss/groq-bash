@@ -13,7 +13,7 @@ TRANSCRIPTION_MODEL="whisper-large-v3"
 TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 
 ENABLE_POST_PROCESSING=true
-POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
+POST_PROCESSING_MODEL="openai/gpt-oss-120b"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
 POST_PROCESSING_INSTRUCTION_PROMPT="You are a text processing AI. Your only task is to follow the user's instruction. Do not add any explanations, greetings, or any text other than the final, processed text. The output must be ONLY the final text."
 POST_PROCESSING_TASK_PROMPT="Correct grammar, spelling, and punctuation, and format it into paragraphs. It is crucial that you identify the original language of the text and provide the corrected text in that same language."
