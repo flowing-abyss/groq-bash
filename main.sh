@@ -23,9 +23,10 @@ END_AUDIO="$SCRIPT_DIR/stop.mp3"
 
 play_notification_audio() {
   local audio_file="$1"
-  local original_volume=$(amixer get Master | grep -o -E '[0-9]+%' | head -n 1 | sed 's/%//')
+  local original_volume
+  original_volume=$(amixer get Master | grep -o -E '[0-9]+%' | head -n 1 | sed 's/%//')
 
-  if [ -n "$original_volume" ]; then
+  if [ -n "$original_volume" ] && [[ "$original_volume" =~ ^[0-9]+$ ]]; then
     local target_volume=$((original_volume * 60 / 100))
     amixer set Master "${target_volume}%" >/dev/null 2>&1
     mpg123 "$audio_file" >/dev/null 2>&1
@@ -59,23 +60,30 @@ start_audio_recording_process() {
 stop_audio_recording_process() {
   pkill -f "arecord --format S16_LE" >/dev/null 2>&1
 
-  local current_pid=$(cat "$PID_FILE")
-  local timeout=600
-  local counter=0
-  while kill -0 "$current_pid" 2>/dev/null; do
-    if [ "$counter" -ge "$timeout" ]; then
-      kill -9 "$current_pid" 2>/dev/null
-      break
-    fi
-    sleep 0.01
-    counter=$((counter + 1))
-  done
+  local current_pid
+  if [ -f "$PID_FILE" ]; then
+    current_pid=$(cat "$PID_FILE")
+  fi
+
+  if [ -n "$current_pid" ]; then
+    local timeout=600
+    local counter=0
+    while kill -0 "$current_pid" 2>/dev/null; do
+      if [ "$counter" -ge "$timeout" ]; then
+        kill -9 "$current_pid" 2>/dev/null
+        break
+      fi
+      sleep 0.01
+      counter=$((counter + 1))
+    done
+  fi
 }
 
 get_audio_duration() {
   local audio_file="$1"
-  local audio_duration=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "$audio_file" 2>/dev/null)
-  date -d@${audio_duration} -u +%H:%M:%S 2>/dev/null || echo "00:00:00"
+  local audio_duration
+  audio_duration=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "$audio_file" 2>/dev/null)
+  date -d@"${audio_duration}" -u +%H:%M:%S 2>/dev/null || echo "00:00:00"
 }
 
 call_transcription_api() {
