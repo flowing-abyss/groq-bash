@@ -72,6 +72,12 @@ stop_audio_recording_process() {
   done
 }
 
+get_audio_duration() {
+  local audio_file="$1"
+  local audio_duration=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "$audio_file" 2>/dev/null)
+  date -d@${audio_duration} -u +%H:%M:%S 2>/dev/null || echo "00:00:00"
+}
+
 call_transcription_api() {
   local audio_file="$1"
 
@@ -122,7 +128,7 @@ else
 
   {
     play_notification_audio "$END_AUDIO" &
-    send_desktop_notification "💬 Speech recognition"
+    send_desktop_notification "💬 Speech recognition" "Duration: $(get_audio_duration "$FLAC_AUDIO_FILE")"
   } &
 
   output=$(call_transcription_api "$FLAC_AUDIO_FILE")
@@ -130,7 +136,7 @@ else
   output=$(jq -r '.text' <<<"$output" 2>/dev/null | awk '{$1=$1};1')
 
   if [ "$ENABLE_POST_PROCESSING" = true ] && [ -n "$output" ]; then
-    send_desktop_notification "📝 Post-processing text" &
+    send_desktop_notification "📝 Post-processing text" "Using model: ${POST_PROCESSING_MODEL}" &
     processed_output=$(call_post_processing_api "$output")
     processed_text=$(echo "$processed_output" | jq -r '.choices[0].message.content' 2>/dev/null | awk '{$1=$1};1')
     if [ -n "$processed_text" ]; then
