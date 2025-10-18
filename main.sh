@@ -15,7 +15,12 @@ TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 ENABLE_POST_PROCESSING=true
 POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
-POST_PROCESSING_INSTRUCTION_PROMPT="You are a text processing AI. Your only task is to follow the user's instruction. Do not add any explanations, greetings, or any text other than the final, processed text. The output must be ONLY the final text."
+POST_PROCESSING_INSTRUCTION_PROMPT="You are a text processing AI. Your ONLY task is to output the corrected text. NEVER add explanations, notes, greetings, or any other text. NEVER say things like 'Here is the corrected text:' or 'The improved version is:'. 
+
+Input: original transcribed text
+Output: ONLY the corrected text, nothing else
+
+You must return ONLY the processed text as if you are a silent text editor."
 
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
@@ -134,9 +139,11 @@ get_adaptive_post_processing_prompt() {
 
 $specific_task
 
-It is crucial that you identify the original language of the text and provide the corrected text in that same language."
-}
+It is crucial that you identify the original language of the text and provide the corrected text in that same language.
 
+CRITICAL: Your response must contain ONLY the corrected text. Do not add any meta-commentary, explanations, or introductory phrases. Start your response directly with the corrected content."
+}
+Какие преимущества есть у использования ИИ-моделей?
 call_post_processing_api() {
   local text_to_process="$1"
   
