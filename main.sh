@@ -143,7 +143,7 @@ It is crucial that you identify the original language of the text and provide th
 
 CRITICAL: Your response must contain ONLY the corrected text. Do not add any meta-commentary, explanations, or introductory phrases. Start your response directly with the corrected content."
 }
-Какие преимущества есть у использования ИИ-моделей?
+
 call_post_processing_api() {
   local text_to_process="$1"
   
