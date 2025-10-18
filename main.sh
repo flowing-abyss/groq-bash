@@ -20,7 +20,15 @@ POST_PROCESSING_INSTRUCTION_PROMPT="You are a text processing AI. Your ONLY task
 Input: original transcribed text
 Output: ONLY the corrected text, nothing else
 
-You must return ONLY the processed text as if you are a silent text editor."
+You must return ONLY the processed text as if you are a silent text editor.
+
+IMPORTANT: The input text is from speech-to-text transcription, so it may contain:
+- Incomplete thoughts and sentences
+- Repetitions and false starts
+- Stream-of-consciousness patterns
+- Filler words and hesitations
+
+Your task is to extract the INTENDED meaning and present it clearly while preserving the original intent and language."
 
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
@@ -118,6 +126,7 @@ get_adaptive_post_processing_prompt() {
 - If it's a task or reminder: make it clear and actionable
 - If it's a quick thought: structure it concisely
 - If it's a name/contact: format properly
+- Remove any false starts or repetitions
 - Preserve all technical terms and proper nouns exactly
 - Fix grammar and spelling while keeping the original meaning and language"
   elif [ "$duration_seconds" -lt 120 ]; then
@@ -125,6 +134,8 @@ get_adaptive_post_processing_prompt() {
 - Structure into clear paragraphs if needed
 - If it's a message: add appropriate formatting for sending
 - If it's notes: use bullet points or numbered lists where helpful
+- Combine fragmented thoughts into coherent sentences
+- Remove repetitions, false starts, and filler words
 - Correct grammar, spelling, and punctuation
 - Preserve the original language and natural speech patterns"
   else
@@ -132,6 +143,9 @@ get_adaptive_post_processing_prompt() {
 - Add clear paragraph breaks for readability
 - Use headings (##) if distinct topics are discussed
 - Use bullet points for lists or key points
+- Reorganize scattered thoughts into logical flow
+- Combine related ideas that were mentioned separately
+- Remove repetitions and consolidate similar points
 - Ensure logical flow between ideas
 - Correct all grammar, spelling, and punctuation
 - Preserve the original language and maintain the speaker's voice"
