@@ -9,7 +9,7 @@ FLAC_AUDIO_FILE="${TMP_DIR}/input.flac"
 
 API_KEY=$(cat "${SCRIPT_DIR}/.api")
 
-TRANSCRIPTION_MODEL="whisper-large-v3"
+TRANSCRIPTION_MODEL="whisper-large-v3-turbo"
 TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 
 ENABLE_POST_PROCESSING=true
