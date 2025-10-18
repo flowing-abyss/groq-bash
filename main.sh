@@ -16,7 +16,6 @@ ENABLE_POST_PROCESSING=true
 POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
 POST_PROCESSING_INSTRUCTION_PROMPT="You are a text processing AI. Your only task is to follow the user's instruction. Do not add any explanations, greetings, or any text other than the final, processed text. The output must be ONLY the final text."
-POST_PROCESSING_TASK_PROMPT="Correct grammar, spelling, and punctuation, and format it into paragraphs. It is crucial that you identify the original language of the text and provide the corrected text in that same language."
 
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
@@ -99,14 +98,58 @@ call_transcription_api() {
     "$TRANSCRIPTION_API_URL"
 }
 
+get_adaptive_post_processing_prompt() {
+  local text="$1"
+  local duration="$2"
+  
+  local duration_seconds=$(echo "$duration" | awk -F: '{print ($1 * 3600) + ($2 * 60) + $3}')
+  
+  local specific_task=""
+  
+  if [ "$duration_seconds" -lt 15 ]; then
+    specific_task="This appears to be a short note or command. Format it as:
+- If it's a task or reminder: make it clear and actionable
+- If it's a quick thought: structure it concisely
+- If it's a name/contact: format properly
+- Preserve all technical terms and proper nouns exactly
+- Fix grammar and spelling while keeping the original meaning and language"
+  elif [ "$duration_seconds" -lt 120 ]; then
+    specific_task="This appears to be a message or idea. Format it as:
+- Structure into clear paragraphs if needed
+- If it's a message: add appropriate formatting for sending
+- If it's notes: use bullet points or numbered lists where helpful
+- Correct grammar, spelling, and punctuation
+- Preserve the original language and natural speech patterns"
+  else
+    specific_task="This appears to be longer content. Format it as:
+- Add clear paragraph breaks for readability
+- Use headings (##) if distinct topics are discussed
+- Use bullet points for lists or key points
+- Ensure logical flow between ideas
+- Correct all grammar, spelling, and punctuation
+- Preserve the original language and maintain the speaker's voice"
+  fi
+  
+  echo "$POST_PROCESSING_INSTRUCTION_PROMPT
+
+$specific_task
+
+It is crucial that you identify the original language of the text and provide the corrected text in that same language."
+}
+
 call_post_processing_api() {
   local text_to_process="$1"
-
-  local raw_user_content
-  raw_user_content=$(printf "%s\n\nTask: %s\n\nText to process: %s" "$POST_PROCESSING_INSTRUCTION_PROMPT" "$POST_PROCESSING_TASK_PROMPT" "$text_to_process")
+  
+  local audio_duration
+  audio_duration=$(get_audio_duration "$FLAC_AUDIO_FILE")
+  
+  local adaptive_prompt
+  adaptive_prompt=$(get_adaptive_post_processing_prompt "$text_to_process" "$audio_duration")
 
   local escaped_user_content
-  escaped_user_content=$(echo "$raw_user_content" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+  escaped_user_content=$(echo "$adaptive_prompt" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+
+  escaped_user_content="${escaped_user_content}\\n\\nText to process: $(echo "$text_to_process" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')"
 
   local json_payload
   json_payload=$(printf '{
@@ -116,7 +159,8 @@ call_post_processing_api() {
         "role": "user",
         "content": "%s"
       }
-    ]
+    ],
+    "temperature": 0.1
   }' "$POST_PROCESSING_MODEL" "$escaped_user_content")
 
   curl -s --compressed --connect-timeout 10 --max-time 180 \
