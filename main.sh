@@ -100,6 +100,8 @@ call_transcription_api() {
     -H "Content-Type: multipart/form-data" \
     -F file="@${audio_file}" \
     -F model="${TRANSCRIPTION_MODEL}" \
+    -F temperature="0" \
+    -F response_format="json" \
     "$TRANSCRIPTION_API_URL"
 }
 
