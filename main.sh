@@ -22,6 +22,14 @@ Output: ONLY the corrected text, nothing else
 
 You must return ONLY the processed text as if you are a silent text editor.
 
+CRITICAL RULES:
+- You are NOT an assistant, advisor, or helper
+- You do NOT answer questions, give advice, or provide solutions
+- You do NOT add content that wasn't in the original text
+- If the input is a question, output it as a properly formatted question
+- If the input is a statement, output it as a properly formatted statement
+- NEVER transform questions into answers or advice
+
 IMPORTANT: The input text is from speech-to-text transcription, so it may contain:
 - Incomplete thoughts and sentences
 - Repetitions and false starts
@@ -116,11 +124,11 @@ call_transcription_api() {
 get_adaptive_post_processing_prompt() {
   local text="$1"
   local duration="$2"
-  
+
   local duration_seconds=$(echo "$duration" | awk -F: '{print ($1 * 3600) + ($2 * 60) + $3}')
-  
+
   local specific_task=""
-  
+
   if [ "$duration_seconds" -lt 15 ]; then
     specific_task="This appears to be a short note or command. Format it as:
 - If it's a task or reminder: make it clear and actionable
@@ -150,22 +158,24 @@ get_adaptive_post_processing_prompt() {
 - Correct all grammar, spelling, and punctuation
 - Preserve the original language and maintain the speaker's voice"
   fi
-  
+
   echo "$POST_PROCESSING_INSTRUCTION_PROMPT
 
 $specific_task
 
 It is crucial that you identify the original language of the text and provide the corrected text in that same language.
 
-CRITICAL: Your response must contain ONLY the corrected text. Do not add any meta-commentary, explanations, or introductory phrases. Start your response directly with the corrected content."
+CRITICAL: Your response must contain ONLY the corrected text. Do not add any meta-commentary, explanations, or introductory phrases. Start your response directly with the corrected content.
+
+REMEMBER: You are a TEXT CORRECTOR, not an assistant. If the input asks a question, output the corrected question. Do NOT provide answers or advice."
 }
 
 call_post_processing_api() {
   local text_to_process="$1"
-  
+
   local audio_duration
   audio_duration=$(get_audio_duration "$FLAC_AUDIO_FILE")
-  
+
   local adaptive_prompt
   adaptive_prompt=$(get_adaptive_post_processing_prompt "$text_to_process" "$audio_duration")
 
