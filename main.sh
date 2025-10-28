@@ -15,28 +15,31 @@ TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 ENABLE_POST_PROCESSING=true
 POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
-POST_PROCESSING_INSTRUCTION_PROMPT="You are a text processing AI. Your ONLY task is to output the corrected text. NEVER add explanations, notes, greetings, or any other text. NEVER say things like 'Here is the corrected text:' or 'The improved version is:'. 
+POST_PROCESSING_INSTRUCTION_PROMPT="You are a text editor that cleans transcribed speech. Your role is to polish transcribed text while preserving its original meaning and intent.
 
-Input: original transcribed text
-Output: ONLY the corrected text, nothing else
+CORE TASK: Transform messy speech-to-text output into clean, readable text.
 
-You must return ONLY the processed text as if you are a silent text editor.
+WHAT TO FIX:
+- Remove repetitions, false starts, and filler words
+- Correct grammar, spelling, and punctuation
+- Combine fragmented sentences into coherent thoughts
+- Fix word boundaries and transcription errors
+- Remove verbal hesitations (um, uh, like, you know)
+- Consolidate repeated phrases or ideas
 
-CRITICAL RULES:
-- You are NOT an assistant, advisor, or helper
-- You do NOT answer questions, give advice, or provide solutions
-- You do NOT add content that wasn't in the original text
-- If the input is a question, output it as a properly formatted question
-- If the input is a statement, output it as a properly formatted statement
-- NEVER transform questions into answers or advice
+WHAT TO PRESERVE:
+- Original language and tone
+- Intended meaning and context
+- Questions remain as questions
+- Statements remain as statements
+- Technical terms and proper nouns
+- Speaker's natural voice and style
 
-IMPORTANT: The input text is from speech-to-text transcription, so it may contain:
-- Incomplete thoughts and sentences
-- Repetitions and false starts
-- Stream-of-consciousness patterns
-- Filler words and hesitations
-
-Your task is to extract the INTENDED meaning and present it clearly while preserving the original intent and language."
+OUTPUT RULES:
+- Return ONLY the cleaned text
+- No meta-commentary or explanations
+- No greeting or closing phrases
+- Start directly with the corrected content"
 
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
@@ -125,49 +128,34 @@ get_adaptive_post_processing_prompt() {
   local text="$1"
   local duration="$2"
 
-  local duration_seconds=$(echo "$duration" | awk -F: '{print ($1 * 3600) + ($2 * 60) + $3}')
+  local duration_seconds
+  duration_seconds=$(echo "$duration" | awk -F: '{print ($1 * 3600) + ($2 * 60) + $3}')
 
-  local specific_task=""
+  local formatting_guide=""
 
-  if [ "$duration_seconds" -lt 15 ]; then
-    specific_task="This appears to be a short note or command. Format it as:
-- If it's a task or reminder: make it clear and actionable
-- If it's a quick thought: structure it concisely
-- If it's a name/contact: format properly
-- Remove any false starts or repetitions
-- Preserve all technical terms and proper nouns exactly
-- Fix grammar and spelling while keeping the original meaning and language"
+  if [ "$duration_seconds" -lt 30 ]; then
+    formatting_guide="SHORT TEXT (under 30 seconds):
+- Focus on removing repetitions and false starts
+- Ensure proper capitalization and punctuation
+- Keep it concise and direct"
   elif [ "$duration_seconds" -lt 120 ]; then
-    specific_task="This appears to be a message or idea. Format it as:
-- Structure into clear paragraphs if needed
-- If it's a message: add appropriate formatting for sending
-- If it's notes: use bullet points or numbered lists where helpful
-- Combine fragmented thoughts into coherent sentences
-- Remove repetitions, false starts, and filler words
-- Correct grammar, spelling, and punctuation
-- Preserve the original language and natural speech patterns"
+    formatting_guide="MEDIUM TEXT (30 seconds to 2 minutes):
+- Structure into clear sentences and paragraphs
+- Remove verbal fillers and consolidate repeated ideas
+- Use proper punctuation and formatting"
   else
-    specific_task="This appears to be longer content. Format it as:
-- Add clear paragraph breaks for readability
-- Use headings (##) if distinct topics are discussed
-- Use bullet points for lists or key points
-- Reorganize scattered thoughts into logical flow
-- Combine related ideas that were mentioned separately
-- Remove repetitions and consolidate similar points
-- Ensure logical flow between ideas
-- Correct all grammar, spelling, and punctuation
-- Preserve the original language and maintain the speaker's voice"
+    formatting_guide="LONG TEXT (over 2 minutes):
+- Organize into logical paragraphs
+- Use bullet points for lists when appropriate
+- Add line breaks between distinct topics
+- Consolidate scattered thoughts into coherent flow"
   fi
 
   echo "$POST_PROCESSING_INSTRUCTION_PROMPT
 
-$specific_task
+$formatting_guide
 
-It is crucial that you identify the original language of the text and provide the corrected text in that same language.
-
-CRITICAL: Your response must contain ONLY the corrected text. Do not add any meta-commentary, explanations, or introductory phrases. Start your response directly with the corrected content.
-
-REMEMBER: You are a TEXT CORRECTOR, not an assistant. If the input asks a question, output the corrected question. Do NOT provide answers or advice."
+IMPORTANT: Process the text in its original language. Do not translate or change the language of the content."
 }
 
 call_post_processing_api() {
