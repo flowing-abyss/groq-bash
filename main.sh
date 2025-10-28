@@ -26,6 +26,7 @@ WHAT TO FIX:
 - Fix word boundaries and transcription errors
 - Remove verbal hesitations (um, uh, like, you know)
 - Consolidate repeated phrases or ideas
+- Convert borrowed/foreign words to their original language spelling when appropriate
 
 WHAT TO PRESERVE:
 - Original language and tone
