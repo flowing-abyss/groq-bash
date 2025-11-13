@@ -92,7 +92,7 @@ stop_audio_recording_process() {
   fi
 
   if [ -n "$current_pid" ]; then
-    local timeout=600
+    local timeout=3000
     local counter=0
     while kill -0 "$current_pid" 2>/dev/null; do
       if [ "$counter" -ge "$timeout" ]; then
@@ -115,7 +115,7 @@ get_audio_duration() {
 call_transcription_api() {
   local audio_file="$1"
 
-  curl -s --compressed --connect-timeout 10 --max-time 60 \
+  curl -s --compressed --connect-timeout 10 --max-time 300 \
     -H "Authorization: Bearer ${API_KEY}" \
     -H "Content-Type: multipart/form-data" \
     -F file="@${audio_file}" \
@@ -207,7 +207,20 @@ else
     send_desktop_notification "💬 Speech recognition" "Duration: $(get_audio_duration "$FLAC_AUDIO_FILE")"
   } &
 
+  file_size=$(stat -f%z "$FLAC_AUDIO_FILE" 2>/dev/null || stat -c%s "$FLAC_AUDIO_FILE" 2>/dev/null)
+  if [ -z "$file_size" ] || [ "$file_size" -lt 100 ]; then
+    send_desktop_notification "❌ Recording error" "Audio file is too small or empty" &
+    rm -f "$FLAC_AUDIO_FILE" "$PID_FILE"
+    exit 1
+  fi
+
   output=$(call_transcription_api "$FLAC_AUDIO_FILE")
+
+  if [ -z "$output" ] || ! echo "$output" | jq -e '.text' >/dev/null 2>&1; then
+    send_desktop_notification "❌ Transcription failed" "API timeout or error" &
+    rm -f "$FLAC_AUDIO_FILE" "$PID_FILE"
+    exit 1
+  fi
 
   output=$(jq -r '.text' <<<"$output" 2>/dev/null | awk '{$1=$1};1')
 
