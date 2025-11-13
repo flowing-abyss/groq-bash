@@ -109,13 +109,19 @@ get_audio_duration() {
   local audio_file="$1"
   local audio_duration
   audio_duration=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "$audio_file" 2>/dev/null)
-  date -d@"${audio_duration}" -u +%H:%M:%S 2>/dev/null || echo "00:00:00"
+
+  local seconds=${audio_duration%.*}
+  local hours=$((seconds / 3600))
+  local minutes=$(((seconds % 3600) / 60))
+  local secs=$((seconds % 60))
+
+  printf "%02d:%02d:%02d\n" "$hours" "$minutes" "$secs"
 }
 
 call_transcription_api() {
   local audio_file="$1"
 
-  curl -s --compressed --connect-timeout 10 --max-time 300 \
+  curl -s --compressed --connect-timeout 30 --max-time 900 \
     -H "Authorization: Bearer ${API_KEY}" \
     -H "Content-Type: multipart/form-data" \
     -F file="@${audio_file}" \
@@ -185,7 +191,7 @@ call_post_processing_api() {
     "temperature": 0.1
   }' "$POST_PROCESSING_MODEL" "$escaped_user_content")
 
-  curl -s --compressed --connect-timeout 10 --max-time 180 \
+  curl -s --compressed --connect-timeout 30 --max-time 600 \
     -H "Authorization: Bearer ${API_KEY}" \
     -H "Content-Type: application/json" \
     -d "$json_payload" \
