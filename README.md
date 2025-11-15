@@ -14,8 +14,8 @@ Ensure these programs are installed on your system:
 *   `curl`
 *   `jq`
 *   `notify-send` (from `libnotify`)
-*   `wl-copy` (from `wl-clipboard`)
-*   `hyprctl` (Hyprland)
+*   `wl-copy` (from `wl-clipboard`) / `xclip`
+*   `hyprctl` (Hyprland) / `xdotool`
 *   `ffmpeg`
 
 ## Installation

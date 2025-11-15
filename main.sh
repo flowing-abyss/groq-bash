@@ -68,11 +68,19 @@ send_desktop_notification() {
 
 copy_text_to_clipboard() {
   local text="$1"
-  printf "%s" "$text" | wl-copy
+  if [ -n "$WAYLAND_DISPLAY" ]; then
+    printf "%s" "$text" | wl-copy
+  else
+    printf "%s" "$text" | xclip -selection clipboard
+  fi
 }
 
 simulate_paste_shortcut() {
-  hyprctl dispatch sendshortcut "CTRL,V,"
+  if [ -n "$WAYLAND_DISPLAY" ]; then
+    hyprctl dispatch sendshortcut "CTRL,V,"
+  else
+    xdotool key --clearmodifiers ctrl+v
+  fi
 }
 
 start_audio_recording_process() {
