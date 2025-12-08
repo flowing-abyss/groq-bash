@@ -15,30 +15,39 @@ TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 ENABLE_POST_PROCESSING=true
 POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
-POST_PROCESSING_INSTRUCTION_PROMPT="You are a text editor that cleans transcribed speech. Your role is to polish transcribed text while preserving its original meaning and intent.
+POST_PROCESSING_INSTRUCTION_PROMPT="You are a text editor that cleans and polishes transcribed speech. Your role is to transform messy speech-to-text output into clean, precise, and naturally flowing text.
 
-CORE TASK: Transform messy speech-to-text output into clean, readable text.
+CORE TASK: Clean up transcribed text while preserving its original meaning and intent.
 
 WHAT TO FIX:
-- Remove repetitions, false starts, and filler words
-- Correct grammar, spelling, and punctuation
-- Combine fragmented sentences into coherent thoughts
-- Fix word boundaries and transcription errors
-- Remove verbal hesitations (um, uh, like, you know)
-- Consolidate repeated phrases or ideas
+- Remove all filler words and verbal hesitations (um, uh, like, you know, well, so, actually)
+- Eliminate repetitions, false starts, and stuttering
+- Remove redundant phrases and repeated ideas
+- Correct grammar, spelling, and punctuation errors
+- Fix word boundaries and transcription mistakes
+- Combine fragmented sentences into coherent, complete thoughts
+- Structure the text with proper paragraphs and formatting
 - Convert borrowed/foreign words to their original language spelling when appropriate
+- Remove unnecessary verbal padding while keeping the core message
 
 WHAT TO PRESERVE:
-- Original language and tone
-- Intended meaning and context
+- Original language (do not translate)
+- Speaker's intended meaning and context
+- Natural tone and speaking style
 - Questions remain as questions
 - Statements remain as statements
 - Technical terms and proper nouns
-- Speaker's natural voice and style
+- Key emphasis and important points
+
+FORMATTING:
+- Use clear sentence structure
+- Add paragraph breaks for different topics
+- Use bullet points for lists when appropriate
+- Ensure proper capitalization
 
 OUTPUT RULES:
 - Return ONLY the cleaned text
-- No meta-commentary or explanations
+- No meta-commentary, explanations, or notes
 - No greeting or closing phrases
 - Start directly with the corrected content"
 
@@ -139,51 +148,11 @@ call_transcription_api() {
     "$TRANSCRIPTION_API_URL"
 }
 
-get_adaptive_post_processing_prompt() {
-  local text="$1"
-  local duration="$2"
-
-  local duration_seconds
-  duration_seconds=$(echo "$duration" | awk -F: '{print ($1 * 3600) + ($2 * 60) + $3}')
-
-  local formatting_guide=""
-
-  if [ "$duration_seconds" -lt 30 ]; then
-    formatting_guide="SHORT TEXT (under 30 seconds):
-- Focus on removing repetitions and false starts
-- Ensure proper capitalization and punctuation
-- Keep it concise and direct"
-  elif [ "$duration_seconds" -lt 120 ]; then
-    formatting_guide="MEDIUM TEXT (30 seconds to 2 minutes):
-- Structure into clear sentences and paragraphs
-- Remove verbal fillers and consolidate repeated ideas
-- Use proper punctuation and formatting"
-  else
-    formatting_guide="LONG TEXT (over 2 minutes):
-- Organize into logical paragraphs
-- Use bullet points for lists when appropriate
-- Add line breaks between distinct topics
-- Consolidate scattered thoughts into coherent flow"
-  fi
-
-  echo "$POST_PROCESSING_INSTRUCTION_PROMPT
-
-$formatting_guide
-
-IMPORTANT: Process the text in its original language. Do not translate or change the language of the content."
-}
-
 call_post_processing_api() {
   local text_to_process="$1"
 
-  local audio_duration
-  audio_duration=$(get_audio_duration "$FLAC_AUDIO_FILE")
-
-  local adaptive_prompt
-  adaptive_prompt=$(get_adaptive_post_processing_prompt "$text_to_process" "$audio_duration")
-
   local escaped_user_content
-  escaped_user_content=$(echo "$adaptive_prompt" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+  escaped_user_content=$(echo "$POST_PROCESSING_INSTRUCTION_PROMPT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
 
   escaped_user_content="${escaped_user_content}\\n\\nText to process: $(echo "$text_to_process" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')"
 
