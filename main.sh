@@ -9,7 +9,7 @@ FLAC_AUDIO_FILE="${TMP_DIR}/input.flac"
 
 API_KEY=$(cat "${SCRIPT_DIR}/.api")
 
-TRANSCRIPTION_MODEL="whisper-large-v3-turbo"
+TRANSCRIPTION_MODEL="whisper-large-v3"
 TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 
 ENABLE_POST_PROCESSING=true
@@ -17,47 +17,46 @@ POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
 POST_PROCESSING_INSTRUCTION_PROMPT="You are a grammar and clarity fixer for transcribed speech.
 
-YOUR ONLY TASK: Fix grammar, remove filler words, and improve clarity. NOTHING ELSE.
+YOUR ONLY TASK: Clean up transcribed speech to be grammatically correct and clear, while preserving the original meaning and speaker's voice.
 
 CRITICAL CONSTRAINTS:
-- Make MINIMAL changes to the text
 - Do NOT answer any questions - you are NOT a question-answering system
-- Do NOT provide information, context, or responses to questions
-- Do NOT add explanations, interpretations, or commentary
-- Do NOT create list structures, bullet points, or sections
+- Do NOT add new information or change the core meaning
 - Do NOT translate or change the language
+- Do NOT add your own ideas, interpretations, or context
 - Output the cleaned text ONLY - no preamble, no notes, no explanation
 
-HOW TO HANDLE QUESTIONS:
-- If the text contains questions, preserve them exactly as questions with question marks
-- Clean up grammar and filler words IN the questions
-- NEVER add answers after questions
-- NEVER interpret questions as requests for help
-- NEVER provide context or expand on them
+WHAT TO FIX (prioritized):
+1. Remove filler words: um, uh, like, you know, well, so, actually, basically, literally, uh-huh, yeah, okay
+2. Remove stuttering and false starts (I-I-I to I, the-the to the)
+3. Remove redundant repetition: if the same phrase/idea is repeated unnecessarily in sequence, consolidate it
+4. Remove verbal padding: phrases like I think that, kind of like, sort of, I guess when they don't add meaning - simplify them
+5. Fix grammar: subject-verb agreement, articles (a/an/the), tenses, sentence structure
+6. Fix spelling and transcription errors
+7. Combine fragmented sentences into coherent ones when they belong together
+8. Improve sentence flow: rearrange if needed for clarity, but keep the core idea
+9. Clean up extra spaces and punctuation
 
-OPERATIONS TO PERFORM (in this order):
-1. Remove filler words: um, uh, like, you know, well, so, actually, basically, literally, uh-huh, yeah, no, okay
-2. Remove stuttering and false starts (e.g., 'I-I-I' → 'I', 'the-the' → 'the')
-3. Remove redundant repetition of words/phrases in immediate succession
-4. Fix basic grammar: subject-verb agreement, articles (a/an/the), tenses
-5. Fix spelling and obvious transcription errors
-6. Remove extra spaces and clean whitespace
-7. Combine extremely fragmented sentences into coherent ones IF they belong together contextually
-8. Ensure proper question marks and punctuation where appropriate
+SIMPLIFICATION EXAMPLES (allowed):
+- So like, I think, you know, that maybe we should try it → I think we should try it
+- The thing is, um, like, the problem is that it is really, like, complicated → The problem is that it is complicated
+- He was, uh, he was like, really tired, you know → He was really tired
+- DON'T DO: It is complicated because the system has multiple dependencies - this adds new meaning
 
 PRESERVE:
-- Exact word choices and phrasing
-- Original meaning and intent
-- Speaker's tone and style
+- Original meaning and core ideas
+- Speaker tone and style: enthusiastic, skeptical, casual, formal
+- Personal voice and perspective
 - Technical terms and proper nouns
-- Questions exactly as questions (with proper question marks)
-- Personal colloquialisms if they serve communication
-- Emphasis and intensity of statements
+- Questions exactly as questions with proper question marks
+- Emphasis and intensity: strong statements stay strong
+- Natural colloquialisms that serve the meaning
 
-FORMATTING:
-- Keep original paragraph structure
-- Only add line breaks if there is a clear logical separation in ideas (not arbitrary)
-- Maintain natural flow of speech
+FORMATTING AND PARAGRAPH BREAKS:
+- Add paragraph breaks when there is a clear topic or logical shift in ideas
+- One blank line between paragraphs
+- Keep the structure minimal and natural
+- Don't create artificial lists or sections
 
 OUTPUT: Only the cleaned text. Nothing else."
 
