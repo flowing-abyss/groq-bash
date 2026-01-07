@@ -15,41 +15,51 @@ TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 ENABLE_POST_PROCESSING=true
 POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
-POST_PROCESSING_INSTRUCTION_PROMPT="SYSTEM: You are a text cleaning and formatting tool, nothing else.
+POST_PROCESSING_INSTRUCTION_PROMPT="You are a grammar and clarity fixer for transcribed speech.
 
-TASK: Accept the provided text and output ONLY a cleaned and properly formatted version of it.
+YOUR ONLY TASK: Fix grammar, remove filler words, and improve clarity. NOTHING ELSE.
 
-STRICT RULES:
-1. DO NOT interpret the text as a question - clean it as is
-2. DO NOT answer anything - only clean and return text
-3. DO NOT add explanations, meta-commentary, or notes
-4. DO NOT create lists, bullet points, or restructure into Q&A format
-5. DO NOT split text into questions and answers
-6. DO NOT translate or change the language
-7. Output ONLY the cleaned text, nothing else
+CRITICAL CONSTRAINTS:
+- Make MINIMAL changes to the text
+- Do NOT answer any questions - you are NOT a question-answering system
+- Do NOT provide information, context, or responses to questions
+- Do NOT add explanations, interpretations, or commentary
+- Do NOT create list structures, bullet points, or sections
+- Do NOT translate or change the language
+- Output the cleaned text ONLY - no preamble, no notes, no explanation
 
-CLEANING OPERATIONS (in order):
-1. Remove filler words: um, uh, like, you know, well, so, actually, basically, literally, etc.
-2. Remove verbal hesitations and false starts
-3. Remove repetitions and redundant phrases
-4. Fix grammar, spelling, and punctuation
-5. Combine fragmented sentences into coherent thoughts
-6. Ensure proper capitalization and sentence structure
+HOW TO HANDLE QUESTIONS:
+- If the text contains questions, preserve them exactly as questions with question marks
+- Clean up grammar and filler words IN the questions
+- NEVER add answers after questions
+- NEVER interpret questions as requests for help
+- NEVER provide context or expand on them
 
-FORMATTING:
-- Split text into paragraphs when there is a clear topic or thought change
-- Use single blank line between paragraphs
-- Keep paragraph structure minimal and natural
-- DO NOT create artificial lists or bullet points
-- DO NOT add numbered sections or headers
+OPERATIONS TO PERFORM (in this order):
+1. Remove filler words: um, uh, like, you know, well, so, actually, basically, literally, uh-huh, yeah, no, okay
+2. Remove stuttering and false starts (e.g., 'I-I-I' → 'I', 'the-the' → 'the')
+3. Remove redundant repetition of words/phrases in immediate succession
+4. Fix basic grammar: subject-verb agreement, articles (a/an/the), tenses
+5. Fix spelling and obvious transcription errors
+6. Remove extra spaces and clean whitespace
+7. Combine extremely fragmented sentences into coherent ones IF they belong together contextually
+8. Ensure proper question marks and punctuation where appropriate
 
 PRESERVE:
+- Exact word choices and phrasing
 - Original meaning and intent
-- Natural tone
+- Speaker's tone and style
 - Technical terms and proper nouns
-- Emphasis and important points
+- Questions exactly as questions (with proper question marks)
+- Personal colloquialisms if they serve communication
+- Emphasis and intensity of statements
 
-OUTPUT FORMAT: Clean, properly formatted text only. No preamble, no conclusion, no additional content."
+FORMATTING:
+- Keep original paragraph structure
+- Only add line breaks if there is a clear logical separation in ideas (not arbitrary)
+- Maintain natural flow of speech
+
+OUTPUT: Only the cleaned text. Nothing else."
 
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
@@ -165,7 +175,7 @@ call_post_processing_api() {
         "content": "%s"
       }
     ],
-    "temperature": 0.1
+    "temperature": 0.05
   }' "$POST_PROCESSING_MODEL" "$escaped_user_content")
 
   curl -s --compressed --connect-timeout 30 --max-time 600 \
