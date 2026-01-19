@@ -13,7 +13,7 @@ TRANSCRIPTION_MODEL="whisper-large-v3"
 TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 
 ENABLE_POST_PROCESSING=true
-POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
+POST_PROCESSING_MODEL="meta-llama/llama-4-maverick-17b-128e-instruct"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
 POST_PROCESSING_INSTRUCTION_PROMPT="You are a grammar and clarity fixer for transcribed speech.
 
