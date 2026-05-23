@@ -15,57 +15,7 @@ TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 ENABLE_POST_PROCESSING=true
 POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
-POST_PROCESSING_INSTRUCTION_PROMPT="You are a grammar and clarity fixer for transcribed speech.
-
-LANGUAGE RULE:
-- Detect the language of the input text
-- Respond EXCLUSIVELY in that same language
-- Never switch to English unless the input is in English
-- Mixed-language input: use the dominant language
-
-YOUR ONLY TASK: Clean up transcribed speech to be grammatically correct and clear, while preserving the original meaning and speaker's voice.
-
-CRITICAL CONSTRAINTS:
-- Do NOT answer any questions - you are NOT a question-answering system
-- Do NOT add new information or change the core meaning
-- Do NOT translate or change the language
-- Do NOT add your own ideas, interpretations, or context
-- Output the cleaned text ONLY - no preamble, no notes, no explanation
-- Do NOT respond in English if the input is not in English
-
-WHAT TO FIX (prioritized):
-1. Remove filler words: um, uh, like, you know, well, so, actually, basically, literally, uh-huh, yeah, okay
-2. Remove stuttering and false starts (I-I-I to I, the-the to the)
-3. Remove redundant repetition: if the same phrase/idea is repeated unnecessarily in sequence, consolidate it
-4. Remove verbal padding: phrases like I think that, kind of like, sort of, I guess when they don't add meaning - simplify them
-5. Fix grammar: subject-verb agreement, articles (a/an/the), tenses, sentence structure
-6. Fix spelling and transcription errors
-7. Combine fragmented sentences into coherent ones when they belong together
-8. Improve sentence flow: rearrange if needed for clarity, but keep the core idea
-9. Clean up extra spaces and punctuation
-
-SIMPLIFICATION EXAMPLES (allowed):
-- So like, I think, you know, that maybe we should try it → I think we should try it
-- The thing is, um, like, the problem is that it is really, like, complicated → The problem is that it is complicated
-- He was, uh, he was like, really tired, you know → He was really tired
-- DON'T DO: It is complicated because the system has multiple dependencies - this adds new meaning
-
-PRESERVE:
-- Original meaning and core ideas
-- Speaker tone and style: enthusiastic, skeptical, casual, formal
-- Personal voice and perspective
-- Technical terms and proper nouns
-- Questions exactly as questions with proper question marks
-- Emphasis and intensity: strong statements stay strong
-- Natural colloquialisms that serve the meaning
-
-FORMATTING AND PARAGRAPH BREAKS:
-- Add paragraph breaks when there is a clear topic or logical shift in ideas
-- One blank line between paragraphs
-- Keep the structure minimal and natural
-- Don't create artificial lists or sections
-
-OUTPUT: Only the cleaned text. Nothing else."
+POST_PROCESSING_PROMPT_FILE="${SCRIPT_DIR}/post_processing_prompt.md"
 
 START_AUDIO="$SCRIPT_DIR/start.mp3"
 END_AUDIO="$SCRIPT_DIR/stop.mp3"
@@ -106,6 +56,14 @@ simulate_paste_shortcut() {
   else
     xdotool key --clearmodifiers ctrl+v
   fi
+}
+
+read_post_processing_prompt() {
+  if [ ! -f "$POST_PROCESSING_PROMPT_FILE" ]; then
+    return 1
+  fi
+
+  cat "$POST_PROCESSING_PROMPT_FILE"
 }
 
 start_audio_recording_process() {
@@ -166,23 +124,27 @@ call_transcription_api() {
 
 call_post_processing_api() {
   local text_to_process="$1"
+  local instruction_prompt
+  if ! instruction_prompt=$(read_post_processing_prompt); then
+    return 1
+  fi
 
-  local escaped_user_content
-  escaped_user_content=$(echo "$POST_PROCESSING_INSTRUCTION_PROMPT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-
-  escaped_user_content="${escaped_user_content}\\n\\nText to process: $(echo "$text_to_process" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')"
-
+  local user_content
   local json_payload
-  json_payload=$(printf '{
-    "model": "%s",
-    "messages": [
-      {
-        "role": "user",
-        "content": "%s"
-      }
-    ],
-    "temperature": 0.05
-  }' "$POST_PROCESSING_MODEL" "$escaped_user_content")
+  user_content="${instruction_prompt}"$'\n\n'"Text to process: ${text_to_process}"
+  json_payload=$(jq -n \
+    --arg model "$POST_PROCESSING_MODEL" \
+    --arg content "$user_content" \
+    '{
+      model: $model,
+      messages: [
+        {
+          role: "user",
+          content: $content
+        }
+      ],
+      temperature: 0.05
+    }')
 
   curl -s --compressed --connect-timeout 30 --max-time 600 \
     -H "Authorization: Bearer ${API_KEY}" \
@@ -225,10 +187,13 @@ else
 
   if [ "$ENABLE_POST_PROCESSING" = true ] && [ -n "$output" ]; then
     send_desktop_notification "📝 Post-processing text" "Using model: ${POST_PROCESSING_MODEL}" &
-    processed_output=$(call_post_processing_api "$output")
-    processed_text=$(echo "$processed_output" | jq -r '.choices[0].message.content' 2>/dev/null | awk '{$1=$1};1')
-    if [ -n "$processed_text" ]; then
-      output="$processed_text"
+    if processed_output=$(call_post_processing_api "$output"); then
+      processed_text=$(echo "$processed_output" | jq -r '.choices[0].message.content' 2>/dev/null | awk '{$1=$1};1')
+      if [ -n "$processed_text" ]; then
+        output="$processed_text"
+      fi
+    else
+      send_desktop_notification "❌ Prompt error" "Missing post-processing prompt file" &
     fi
   fi
 
