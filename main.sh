@@ -13,7 +13,7 @@ TRANSCRIPTION_MODEL="whisper-large-v3"
 TRANSCRIPTION_API_URL="https://api.groq.com/openai/v1/audio/transcriptions"
 
 ENABLE_POST_PROCESSING=true
-POST_PROCESSING_MODEL="llama-3.3-70b-versatile"
+POST_PROCESSING_MODEL="openai/gpt-oss-120b"
 POST_PROCESSING_API_URL="https://api.groq.com/openai/v1/chat/completions"
 POST_PROCESSING_PROMPT_FILE="${SCRIPT_DIR}/post_processing_prompt.md"
 
